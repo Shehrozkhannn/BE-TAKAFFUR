@@ -1,13 +1,21 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { ExpressAdapter } from '@nestjs/platform-express';
+import * as express from 'express';
+
+const server = express();
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-  const corsOrigin = process.env.CORS_ORIGIN || '*';
+  const app = await NestFactory.create(AppModule, new ExpressAdapter(server));
+
   app.enableCors({
-    origin: corsOrigin.split(','),
-    credentials: true,
+    origin: process.env.CORS_ORIGIN || '*',
   });
-  await app.listen(process.env.PORT ?? 3000);
+
+  await app.init();
 }
+
 bootstrap();
+
+// ✅ Export express server for Vercel
+export default server;
