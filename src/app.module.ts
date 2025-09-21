@@ -19,7 +19,6 @@ import { Mood } from './moods/mood/mood.entity';
         database: process.env.POSTGRES_DB,
         entities: [Mood],
         synchronize: true, // dev only
-        dropSchema: true, 
       }),
     }),
     MoodsModule,

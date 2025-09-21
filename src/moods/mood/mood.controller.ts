@@ -14,9 +14,4 @@ export class MoodsController {
     const suggestedTag = await this.moods.suggestTag(dto.note);
     return { saved, quote,  suggestedTag};
   }
-
-  @Get()
-  findRecent(@Query('limit') limit?: string) {
-    return this.moods.findRecent(Number(limit || 30));
-  }
 }

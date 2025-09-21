@@ -21,13 +21,6 @@ export class MoodsService {
     return this.repo.save(mood);
   }
 
-  findRecent(limit = 30) {
-    return this.repo.find({
-      order: { date: 'DESC', id: 'DESC' },
-      take: limit,
-    });
-  }
-
   suggestTag(note: string): string {
   const lower = note.toLowerCase();
   for (const group of this.tagSuggestions) {
@@ -37,8 +30,5 @@ export class MoodsService {
   }
   return "reflection"; // default fallback
 }
-
-
-
 
 }
