@@ -7,8 +7,19 @@ export class QuoteService {
   private hf = new InferenceClient(process.env.HUGGING_FACE_API_KEY);
   private accessToken: string | null = null;
   private tokenExpiry: number | null = null;
-  async getAdvice(mood: string) {
-    try {
+
+async getAdvice(mood: string) {
+  try {
+    // Step 1: Keyword safety net for sadness-related moods
+    const sadnessKeywords = ["cry", "cried", "crying", "tears", "sad", "depressed", "heartbroken", "grief"];
+    let theme: string | null = null;
+
+    if (sadnessKeywords.some(k => mood.toLowerCase().includes(k))) {
+      theme = "patience"; // Always map sadness/crying to patience
+    }
+
+    // Step 2: If no keyword match, ask the model
+    if (!theme) {
       const response = await this.hf.chatCompletion({
         provider: 'nebius',
         model: 'Qwen/Qwen3-30B-A3B-Instruct-2507',
@@ -16,66 +27,77 @@ export class QuoteService {
           {
             role: 'user',
             content: `The user expressed: "${mood}". 
-                Suggest ONE Quranic theme (patience, hope, gratitude, forgiveness, strength, mercy, guidance, justice, etc.).
-                Only return the single theme word.`,
+              From this fixed list [patience, hope, gratitude, forgiveness, strength, mercy, guidance, justice],
+              pick the single theme that is most relevant. 
+              If the user expresses sadness, grief, hardship, or crying, always map to "patience".
+              If none are relevant, return "gratitude".
+              Only return the word exactly as written in the list.
+            `,
           },
         ],
       });
 
-      const theme =
+      theme =
         response.choices?.[0]?.message?.content?.trim().toLowerCase() || 'patience';
-
-      const ayahMap: Record<string, string> = {
-        patience: '2:153',
-        hope: '39:53',
-        gratitude: '14:7',
-        forgiveness: '24:22',
-        strength: '3:139',
-      };
-      const ayahKey = ayahMap[theme] || '2:286';
-
-      const token = await this.getAccessToken();
-      console.log('Access Token:', token);
-
-      if (!token) throw new Error('Failed to get access token');
-
-      // Step 4: Fetch ayah with translation
-      const quranRes = await fetch(
-        `https://apis.quran.foundation/content/api/v4/verses/by_key/${encodeURIComponent(
-          ayahKey,
-        )}?translations=20&fields=text_uthmani,translations&translation_fields=text`,
-        {
-          headers: {
-            'x-auth-token': token,
-            'x-client-id': process.env.QURAN_CLIENT_ID,
-            'Content-Type': 'application/json',
-          },
-        },
-      );
-
-      const quranData: any = await quranRes.json();
-
-      const ayah = quranData.verse.text_uthmani;
-      const translation =
-        quranData.verse.translations?.[0]?.text.replace(/<[^>]*>?/gm, '') || 'Translation not found';
-
-      return {
-        mood,
-        theme,
-        ayah,
-        translation,
-        reference: ayahKey,
-      };
-    } catch (e) {
-      console.error('Error:', e.message);
-      return {
-        mood,
-        ayah: 'Indeed, Allah is with the patient.',
-        translation: 'Surah Al-Baqarah 2:153',
-        reference: '2:153',
-      };
     }
+
+    // Step 3: Multiple ayahs for variety
+    const ayahMap: Record<string, string[]> = {
+      patience: ['2:153', '2:286', '3:200'],
+      hope: ['39:53', '12:87'],
+      gratitude: ['14:7', '2:152'],
+      forgiveness: ['24:22', '3:135'],
+      strength: ['8:46'],
+      mercy: ['7:156', '21:107'],
+      guidance: ['1:6', '2:2'],
+      justice: ['4:58', '5:8'],
+    };
+
+    const ayahs = ayahMap[theme] || ['2:286'];
+    const ayahKey = ayahs[Math.floor(Math.random() * ayahs.length)]; // Pick random ayah
+
+    const token = await this.getAccessToken();
+    if (!token) throw new Error('Failed to get access token');
+
+    // Step 4: Fetch ayah with translation
+    const quranRes = await fetch(
+      `https://apis.quran.foundation/content/api/v4/verses/by_key/${encodeURIComponent(
+        ayahKey,
+      )}?translations=20&fields=text_uthmani,translations&translation_fields=text`,
+      {
+        headers: {
+          'x-auth-token': token,
+          'x-client-id': process.env.QURAN_CLIENT_ID,
+          'Content-Type': 'application/json',
+        },
+      },
+    );
+
+    const quranData: any = await quranRes.json();
+
+    const ayah = quranData.verse.text_uthmani;
+    const translation =
+      quranData.verse.translations?.[0]?.text.replace(/<[^>]*>?/gm, '') || 'Translation not found';
+
+    return {
+      mood,
+      theme,
+      ayah,
+      translation,
+      reference: ayahKey,
+    };
+  } catch (e) {
+    console.error('Error:', e.message);
+    return {
+      mood,
+      theme: 'patience',
+      ayah: 'Indeed, Allah is with the patient.',
+      translation: 'Surah Al-Baqarah 2:153',
+      reference: '2:153',
+    };
   }
+}
+
 
 
   async getAccessToken() {
